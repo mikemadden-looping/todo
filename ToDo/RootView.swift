@@ -28,6 +28,9 @@ struct RootView: View {
         .onChange(of: selection) { _, _ in path = [] }
         .onAppear {
             if sizeClass == .regular, selection == nil { selection = .smart(.myDay) }
+            #if DEBUG
+            if DemoData.isEnabled { demoSetup() }
+            #endif
         }
         .onReceive(NotificationCenter.default.publisher(for: .openTask)) { note in
             guard let id = note.object as? String, let uuid = UUID(uuidString: id) else { return }
@@ -60,6 +63,28 @@ struct RootView: View {
                 .foregroundStyle(.white.opacity(0.7))
         }
     }
+
+    #if DEBUG
+    /// Screenshot workflow: `-seedDemo YES -open myDay|planned|list:<name>|task:<title>`.
+    private func demoSetup() {
+        guard Actions.allLists().isEmpty else { return }
+        DemoData.seed()
+        guard let open = UserDefaults.standard.string(forKey: "open") else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            if let s = SmartList(rawValue: open) {
+                selection = .smart(s)
+            } else if open.hasPrefix("list:") {
+                let name = String(open.dropFirst(5))
+                if let l = Actions.allLists().first(where: { $0.displayName.contains(name) }) { selection = .list(l.objectID) }
+            } else if open.hasPrefix("task:") {
+                let title = String(open.dropFirst(5))
+                let req = NSFetchRequest<TodoTask>(entityName: "TodoTask")
+                req.predicate = NSPredicate(format: "title BEGINSWITH %@", title)
+                if let t = try? ctx.fetch(req).first { self.open(t) }
+            }
+        }
+    }
+    #endif
 
     /// Shows a task's list and then the task itself (used by search and reminders).
     func open(_ task: TodoTask) {

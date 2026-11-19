@@ -7,7 +7,11 @@ import os
 /// the private store holds everything you own (including lists you share with
 /// others), and the shared store holds lists other people shared with you.
 final class Persistence {
+    #if DEBUG
+    static let shared = Persistence(inMemory: UserDefaults.standard.bool(forKey: "seedDemo"))
+    #else
     static let shared = Persistence()
+    #endif
 
     let container: NSPersistentCloudKitContainer
     private(set) var privateStore: NSPersistentStore?
@@ -31,7 +35,6 @@ final class Persistence {
         for desc in [privateDesc, sharedDesc] {
             desc.setOption(true as NSNumber, forKey: NSPersistentHistoryTrackingKey)
             desc.setOption(true as NSNumber, forKey: NSPersistentStoreRemoteChangeNotificationPostOptionKey)
-            if inMemory { desc.url = URL(fileURLWithPath: "/dev/null") }
         }
 
         let privateOptions = NSPersistentCloudKitContainerOptions(containerIdentifier: cloudContainerID)
@@ -42,6 +45,19 @@ final class Persistence {
         sharedOptions.databaseScope = .shared
         sharedDesc.cloudKitContainerOptions = sharedOptions
 
+        if inMemory {
+            // Throwaway local stores with no iCloud, for screenshots.
+            let tmp = FileManager.default.temporaryDirectory
+            for (desc, name) in [(privateDesc, "demo-private"), (sharedDesc, "demo-shared")] {
+                let url = tmp.appendingPathComponent("\(name).sqlite")
+                for suffix in ["", "-wal", "-shm"] {
+                    try? FileManager.default.removeItem(at: URL(fileURLWithPath: url.path + suffix))
+                }
+                desc.url = url
+                desc.cloudKitContainerOptions = nil
+            }
+        }
+
         container.persistentStoreDescriptions = [privateDesc, sharedDesc]
         container.loadPersistentStores { [log] desc, error in
             if let error {
@@ -50,8 +66,9 @@ final class Persistence {
         }
 
         for store in container.persistentStoreCoordinator.persistentStores {
-            if store.url?.lastPathComponent == "private.sqlite" { privateStore = store }
-            if store.url?.lastPathComponent == "shared.sqlite" { sharedStore = store }
+            let name = store.url?.lastPathComponent ?? ""
+            if name.hasSuffix("private.sqlite") { privateStore = store }
+            if name.hasSuffix("shared.sqlite") { sharedStore = store }
         }
 
         container.viewContext.automaticallyMergesChangesFromParent = true

@@ -1,0 +1,60 @@
+name: 5. Screenshots
+run-name: Screenshots (${{ github.ref_name }})
+
+# Runs the app in the iOS Simulator with sample data and saves screenshots
+# as a downloadable artifact. Needs no secrets.
+on:
+  workflow_dispatch:
+
+jobs:
+  screenshots:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Select Xcode
+        run: |
+          XCODE=$(ls -d /Applications/Xcode_26*.app | sort -V | tail -1)
+          sudo xcode-select --switch "$XCODE/Contents/Developer"
+
+      - name: Generate Xcode project
+        run: |
+          brew install xcodegen
+          xcodegen generate
+
+      - name: Build for Simulator
+        run: |
+          set -o pipefail
+          xcodebuild -project ToDo.xcodeproj -scheme ToDo -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' -derivedDataPath dd \
+            CODE_SIGNING_ALLOWED=NO PRODUCT_BUNDLE_IDENTIFIER=com.example.todo build | tail -3
+
+      - name: Take screenshots
+        run: |
+          APP=$(find dd -name 'ToDo.app' -path '*iphonesimulator*' -type d | head -1)
+          mkdir -p shots
+          shoot() {
+            dev="$1"; prefix="$2"
+            xcrun simctl boot "$dev" || true
+            xcrun simctl bootstatus "$dev" -b
+            xcrun simctl status_bar "$dev" override --time "9:41" --batteryState charged --batteryLevel 100 || true
+            xcrun simctl install "$dev" "$APP"
+            for screen in none myDay important planned tasks "list:Groceries" "list:House" "list:London" "task:Plant garlic" "task:Sign permission"; do
+              xcrun simctl terminate "$dev" com.example.todo 2>/dev/null || true
+              xcrun simctl launch "$dev" com.example.todo -seedDemo YES -open "$screen"
+              sleep 6
+              name=$(echo "$screen" | tr ': ' '__')
+              xcrun simctl io "$dev" screenshot "shots/${prefix}-${name}.png"
+            done
+            xcrun simctl shutdown "$dev" || true
+          }
+          IPHONE=$(xcrun simctl list devices available | grep -E "iPhone 1[6-9] \(" | grep -v Plus | head -1 | grep -oE '[0-9A-F-]{36}')
+          IPAD=$(xcrun simctl list devices available | grep -E "iPad Pro|iPad Air" | head -1 | grep -oE '[0-9A-F-]{36}')
+          echo "iPhone $IPHONE, iPad $IPAD"
+          shoot "$IPHONE" iphone
+          [ -n "$IPAD" ] && shoot "$IPAD" ipad || true
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: screenshots
+          path: shots
