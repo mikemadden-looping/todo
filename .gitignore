@@ -1,0 +1,11 @@
+*.xcodeproj/
+ToDo/Info.plist
+ToDo/ToDo.entitlements
+build/
+buildlog/
+*.ipa
+*.dSYM.zip
+*.mobileprovision
+fastlane/report.xml
+fastlane/README.md
+.DS_Store
