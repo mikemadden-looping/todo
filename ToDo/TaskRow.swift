@@ -86,7 +86,7 @@ struct TaskRow: View {
         case .due(let date):
             let overdue = task.isOverdue
             let today = Calendar.current.isDateInToday(date)
-            Label(overdue ? "Overdue, \(DateLabel.day(date))" : DateLabel.day(date), systemImage: "calendar")
+            Label(DateLabel.day(date), systemImage: "calendar")
                 .foregroundStyle(task.isCompleted ? Color.secondary : (overdue ? Color.red : (today ? accent : Color.secondary)))
         case .reminder:
             Image(systemName: "bell")

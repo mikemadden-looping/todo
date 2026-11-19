@@ -19,6 +19,7 @@ struct SidebarView: View {
     @AppStorage(SettingsKey.showSmart(.completed)) private var showCompletedList = false
     @AppStorage(SettingsKey.showDueToday) private var showDueToday = false
 
+    @Environment(\.horizontalSizeClass) private var sizeClass
     @State private var search = ""
     @State private var prompt: TextPrompt?
     @State private var showSettings = false
@@ -57,7 +58,7 @@ struct SidebarView: View {
                 SearchResults(text: search, open: open)
             }
         }
-        .listStyle(.sidebar)
+        .sidebarStyle(compact: sizeClass == .compact)
         .navigationTitle("Lists")
         .navigationBarTitleDisplayMode(.inline)
         .searchable(text: $search, placement: .navigationBarDrawer(displayMode: .automatic), prompt: "Search")
@@ -306,5 +307,12 @@ struct SearchResults: View {
             }
             .buttonStyle(.plain)
         }
+    }
+}
+
+private extension View {
+    /// Plain white list on iPhone like To Do; a real sidebar on iPad and Mac.
+    @ViewBuilder func sidebarStyle(compact: Bool) -> some View {
+        if compact { listStyle(.plain) } else { listStyle(.sidebar) }
     }
 }
