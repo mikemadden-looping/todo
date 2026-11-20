@@ -53,6 +53,7 @@ struct SidebarView: View {
                         case .group(let group): groupRow(group)
                         }
                     }
+                    .onMove(perform: moveTopLevel)
                 }
             } else {
                 SearchResults(text: search, open: open)
@@ -138,6 +139,12 @@ struct SidebarView: View {
         let members = lists.filter { $0.groupID == group.id }
         DisclosureGroup(isExpanded: Binding(get: { group.isExpanded }, set: { group.isExpanded = $0; Actions.save() })) {
             ForEach(members) { listRow($0) }
+                .onMove { from, to in
+                    var arr = members
+                    arr.move(fromOffsets: from, toOffset: to)
+                    for (i, l) in arr.enumerated() { l.order = Double(i) }
+                    Actions.save()
+                }
             if members.isEmpty {
                 Text("Long-press a list and choose Move to group")
                     .font(.caption)
@@ -223,6 +230,19 @@ struct SidebarView: View {
         case .completed: return 0
         case .tasks: return open.filter { $0.list == nil }.count
         }
+    }
+
+    /// Drag to reorder the lists and groups shown at the top level.
+    private func moveTopLevel(from: IndexSet, to: Int) {
+        var items = topLevelItems
+        items.move(fromOffsets: from, toOffset: to)
+        for (i, item) in items.enumerated() {
+            switch item {
+            case .list(let l): l.order = Double(i)
+            case .group(let g): g.order = Double(i)
+            }
+        }
+        Actions.save()
     }
 
     private func rename(_ list: TaskList) {
