@@ -187,6 +187,7 @@ struct SettingsView: View {
                 }
                 Section {
                     LabeledContent("iCloud sync", value: iCloudStatus)
+                    NavigationLink("Sync status") { SyncStatusView() }
                 } footer: {
                     Text("Tasks sync to your other devices signed in to the same iCloud account. Share a list from its person button.")
                 }

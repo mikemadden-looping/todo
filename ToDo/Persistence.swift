@@ -143,8 +143,13 @@ final class Persistence {
         guard let list = try viewContext.existingObject(with: listID) as? TaskList else {
             throw CocoaError(.coderValueNotFound)
         }
-        let (share, _) = try await share(list)
-        return share
+        do {
+            let (share, _) = try await share(list)
+            return share
+        } catch {
+            SyncMonitor.shared.recordShareError(error)
+            throw error
+        }
     }
 
     func accept(_ metadata: CKShare.Metadata) {

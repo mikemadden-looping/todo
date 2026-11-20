@@ -11,6 +11,7 @@ struct ToDoApp: App {
 
     init() {
         SettingsKey.registerDefaults()
+        _ = SyncMonitor.shared
     }
 
     var body: some Scene {
