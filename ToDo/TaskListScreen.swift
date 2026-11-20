@@ -137,10 +137,18 @@ struct TaskListScreen: View {
                         .accessibilityLabel("Suggestions")
                 }
                 if isCustomList, !isParticipant {
-                    Button { startSharing() } label: {
-                        Image(systemName: isSharedList ? "person.2.fill" : "person.crop.circle.badge.plus")
+                    if isSharedList {
+                        Menu {
+                            Button { invite() } label: { Label("Invite people", systemImage: "person.crop.circle.badge.plus") }
+                            Button { manageSharing() } label: { Label("Manage people", systemImage: "person.2") }
+                        } label: {
+                            Image(systemName: "person.2.fill")
+                        }
+                        .accessibilityLabel("Sharing")
+                    } else {
+                        Button { invite() } label: { Image(systemName: "person.crop.circle.badge.plus") }
+                            .accessibilityLabel("Share list")
                     }
-                    .accessibilityLabel("Share list")
                 }
                 optionsMenu
             }
@@ -323,8 +331,11 @@ struct TaskListScreen: View {
             if isCustomList {
                 Button { rename() } label: { Label("Rename list", systemImage: "pencil") }
                 if !isParticipant {
-                    Button { startSharing() } label: {
-                        Label(isSharedList ? "Manage sharing" : "Share list", systemImage: "person.crop.circle.badge.plus")
+                    Button { invite() } label: {
+                        Label(isSharedList ? "Invite people" : "Share list", systemImage: "person.crop.circle.badge.plus")
+                    }
+                    if isSharedList {
+                        Button { manageSharing() } label: { Label("Manage people", systemImage: "person.2") }
                     }
                 }
             }
@@ -375,15 +386,16 @@ struct TaskListScreen: View {
         }
     }
 
-    private func startSharing() {
-        Task { @MainActor in
-            do {
-                let (share, container) = try await Persistence.shared.share(list)
-                SharingPresenter.present(share: share, container: container, title: list.displayName)
-            } catch {
-                sharingError = "Make sure you're signed in to iCloud. (\(error.localizedDescription))"
-            }
-        }
+    /// Invite through the system share sheet (Messages, Mail, Copy Link…),
+    /// which sends a proper iCloud invitation and adds the person to the list.
+    private func invite() {
+        SharingPresenter.invite(list: list)
+    }
+
+    /// Apple's screen for seeing and removing people on a shared list.
+    private func manageSharing() {
+        guard let share = Persistence.shared.existingShare(for: list) else { invite(); return }
+        SharingPresenter.present(share: share, container: Persistence.shared.ckContainer, title: list.displayName)
     }
 }
 

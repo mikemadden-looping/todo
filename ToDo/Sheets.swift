@@ -245,6 +245,31 @@ enum SharingPresenter {
         top.present(controller, animated: true)
     }
 
+    static func invite(list: TaskList) {
+        let ck = Persistence.shared.ckContainer
+        let title = list.displayName
+        let provider = NSItemProvider()
+        if let share = Persistence.shared.existingShare(for: list) {
+            provider.registerCKShare(share, container: ck, allowedSharingOptions: .standard)
+        } else {
+            let id = list.objectID
+            provider.registerCKShare(container: ck, allowedSharingOptions: .standard) {
+                try await Persistence.shared.makeShare(listID: id)
+            }
+        }
+        let config = UIActivityItemsConfiguration(itemProviders: [provider])
+        config.metadataProvider = { key in
+            key == .title ? title : nil
+        }
+        let controller = UIActivityViewController(activityItemsConfiguration: config)
+        guard let top = topViewController() else { return }
+        if let pop = controller.popoverPresentationController {
+            pop.sourceView = top.view
+            pop.sourceRect = CGRect(x: top.view.bounds.maxX - 60, y: 60, width: 1, height: 1)
+        }
+        top.present(controller, animated: true)
+    }
+
     private static func topViewController() -> UIViewController? {
         let scene = UIApplication.shared.connectedScenes
             .compactMap { $0 as? UIWindowScene }

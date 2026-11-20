@@ -136,6 +136,17 @@ final class Persistence {
         return (share, ck)
     }
 
+    /// Creates (or returns) the share for a list; used by the share sheet's
+    /// preparation step.
+    @MainActor
+    func makeShare(listID: NSManagedObjectID) async throws -> CKShare {
+        guard let list = try viewContext.existingObject(with: listID) as? TaskList else {
+            throw CocoaError(.coderValueNotFound)
+        }
+        let (share, _) = try await share(list)
+        return share
+    }
+
     func accept(_ metadata: CKShare.Metadata) {
         guard let sharedStore else { return }
         container.acceptShareInvitations(from: [metadata], into: sharedStore) { [log] _, error in
