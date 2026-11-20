@@ -18,6 +18,7 @@ struct TaskListScreen: View {
     @State private var confirmDeleteList = false
     @State private var pendingDelete: TodoTask?
     @State private var sharingError: String?
+    @State private var confirmResetSharing = false
     @Environment(\.dismiss) private var dismiss
 
     /// For smart lists, `list` is a throwaway placeholder that is never saved.
@@ -178,6 +179,13 @@ struct TaskListScreen: View {
                 pendingDelete = nil
             }
         }
+        .confirmationDialog("Sharing for “\(title)” got stuck in iCloud",
+                            isPresented: $confirmResetSharing, titleVisibility: .visible) {
+            Button("Reset sharing") { resetSharing() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("The list is recreated with all its tasks, unshared, so you can share it again. Nothing is lost.")
+        }
         .alert("Couldn't share", isPresented: Binding(get: { sharingError != nil }, set: { if !$0 { sharingError = nil } })) {
             Button("OK", role: .cancel) {}
         } message: { Text(sharingError ?? "") }
@@ -336,6 +344,9 @@ struct TaskListScreen: View {
                     }
                     if isSharedList {
                         Button { manageSharing() } label: { Label("Manage people", systemImage: "person.2") }
+                        Button { confirmResetSharing = true } label: {
+                            Label("Reset sharing", systemImage: "arrow.counterclockwise")
+                        }
                     }
                 }
             }
@@ -389,7 +400,17 @@ struct TaskListScreen: View {
     /// Invite through the system share sheet (Messages, Mail, Copy Link…),
     /// which sends a proper iCloud invitation and adds the person to the list.
     private func invite() {
-        SharingPresenter.invite(list: list)
+        if Persistence.shared.hasStuckShare(list) {
+            confirmResetSharing = true
+        } else {
+            SharingPresenter.invite(list: list)
+        }
+    }
+
+    private func resetSharing() {
+        dismiss()
+        let l = list
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { Actions.resetSharing(l) }
     }
 
     /// Apple's screen for seeing and removing people on a shared list.

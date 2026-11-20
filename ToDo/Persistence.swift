@@ -129,10 +129,51 @@ final class Persistence {
         container.canUpdateRecord(forManagedObjectWith: object.objectID)
     }
 
+    enum ShareProblem: LocalizedError {
+        case stuck, notUploaded, noLink
+        var errorDescription: String? {
+            switch self {
+            case .stuck: return "This list's sharing got stuck in iCloud. Use Reset sharing, then share again."
+            case .notUploaded: return "This list hasn't finished uploading to iCloud yet. Try again in a minute."
+            case .noLink: return "iCloud created the share but didn't return a link."
+            }
+        }
+    }
+
+    /// True when a share exists locally but iCloud never saved it (no link).
+    func hasStuckShare(_ list: TaskList) -> Bool {
+        guard !isInSharedStore(list), let share = existingShare(for: list) else { return false }
+        return share.url == nil
+    }
+
+    /// Waits until the list has been uploaded, so sharing doesn't race the first upload.
+    @MainActor
+    func waitUntilUploaded(_ list: TaskList, timeout: TimeInterval = 30) async -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if !list.objectID.isTemporaryID, container.record(for: list.objectID) != nil { return true }
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+        }
+        return false
+    }
+
+    @MainActor
     func share(_ list: TaskList) async throws -> (CKShare, CKContainer) {
-        if let share = existingShare(for: list) { return (share, ckContainer) }
+        if let share = existingShare(for: list) {
+            if share.url == nil { throw ShareProblem.stuck }
+            return (share, ckContainer)
+        }
+        guard await waitUntilUploaded(list) else { throw ShareProblem.notUploaded }
         let (_, share, ck) = try await container.share([list], to: nil)
         share[CKShare.SystemFieldKey.title] = list.displayName as CKRecordValue
+        if share.url == nil {
+            // The link can arrive a moment after the save.
+            for _ in 0..<5 {
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                if let fresh = existingShare(for: list), fresh.url != nil { return (fresh, ck) }
+            }
+            throw ShareProblem.noLink
+        }
         return (share, ck)
     }
 
@@ -166,10 +207,20 @@ final class Persistence {
         }
     }
 
-    func purgeShare(_ share: CKShare) {
+    /// Clears a share's zone. If iCloud can't (for example the zone never
+    /// existed on the server), `fallback` is deleted locally instead.
+    func purgeShare(_ share: CKShare, fallback: NSManagedObjectID? = nil) {
         guard let store = privateStore else { return }
         container.purgeObjectsAndRecordsInZone(with: share.recordID.zoneID, in: store) { [log] _, error in
-            if let error { log.error("Purging share failed: \(error.localizedDescription)") }
+            guard let error else { return }
+            log.error("Purging share failed: \(error.localizedDescription)")
+            Task { @MainActor in
+                SyncMonitor.shared.recordShareError(error)
+                if let id = fallback, let obj = try? self.viewContext.existingObject(with: id), !obj.isDeleted {
+                    self.viewContext.delete(obj)
+                    self.save()
+                }
+            }
         }
     }
 

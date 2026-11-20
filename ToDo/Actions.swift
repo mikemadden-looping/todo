@@ -258,6 +258,41 @@ enum Actions {
         save()
     }
 
+    /// Recreates a list whose iCloud share got stuck: copies the list and all its
+    /// tasks and steps into a fresh unshared list, then clears out the broken share.
+    @discardableResult
+    static func resetSharing(_ list: TaskList) -> TaskList? {
+        guard let share = Persistence.shared.existingShare(for: list) else { return nil }
+        let copy = TaskList(context: ctx)
+        Persistence.shared.assign(copy, alongside: nil)
+        for key in ["name", "emoji", "themeKey", "sortKey", "sortAscending", "showCompleted", "groupID",
+                    "order", "createdAt", "msID"] {
+            copy.setValue(list.value(forKey: key), forKey: key)
+        }
+        copy.id = UUID()
+        for task in (list.tasks as? Set<TodoTask>) ?? [] {
+            let t = TodoTask(context: ctx)
+            Persistence.shared.assign(t, alongside: nil)
+            for key in ["title", "note", "isCompleted", "completedAt", "isImportant", "dueDate", "reminderDate",
+                        "myDayDate", "repeatFrequency", "repeatInterval", "repeatWeekdays", "createdAt", "order", "msID"] {
+                t.setValue(task.value(forKey: key), forKey: key)
+            }
+            t.id = UUID()
+            t.list = copy
+            for step in task.sortedSteps {
+                let s = TaskStep(context: ctx)
+                Persistence.shared.assign(s, alongside: nil)
+                s.id = UUID(); s.title = step.title; s.isCompleted = step.isCompleted
+                s.order = step.order; s.createdAt = step.createdAt; s.task = t
+            }
+        }
+        // Keep the old list out of the way locally until the purge removes it.
+        list.msID = nil
+        save()
+        Persistence.shared.purgeShare(share, fallback: list.objectID)
+        return copy
+    }
+
     static func ungroupAndDelete(_ group: ListGroup) {
         for list in allLists() where list.groupID == group.id { list.groupID = nil }
         ctx.delete(group)
