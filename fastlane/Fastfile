@@ -108,7 +108,7 @@ platform :ios do
       configuration: "Release",
       export_method: "app-store",
       export_options: { provisioningProfiles: { BUNDLE_ID => profile } },
-      xcargs: "MS_CLIENT_ID='#{MS_CLIENT_ID}'",
+      xcargs: MS_CLIENT_ID.empty? ? nil : "MS_CLIENT_ID='#{MS_CLIENT_ID}'",
       output_name: "ToDo.ipa",
       destination: "generic/platform=iOS",
       buildlog_path: "buildlog"

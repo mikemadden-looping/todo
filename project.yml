@@ -67,7 +67,7 @@ targets:
         DEVELOPMENT_TEAM: ""
         GENERATE_INFOPLIST_FILE: NO
         # Azure app registration's Application (client) ID for the To Do import.
-        MS_CLIENT_ID: ""
+        MS_CLIENT_ID: 9b1d6e41-5195-4cc5-a0e2-1e00dd2c36e0
       configs:
         Debug:
           APS_ENVIRONMENT: development

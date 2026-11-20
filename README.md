@@ -91,9 +91,9 @@ The import signs in to Microsoft Graph, which needs an app registration:
    in any organizational directory and personal Microsoft accounts**.
 3. Redirect URI: platform **Public client/native (mobile & desktop)**, URI
    `todoimport://auth`. Register.
-4. Copy the **Application (client) ID**. Either add it as a repository
-   **variable** (Settings → Secrets and variables → Actions → Variables) named
-   `MS_CLIENT_ID` and rebuild, or paste it into the app's import screen.
+4. Copy the **Application (client) ID**. It's set as `MS_CLIENT_ID` in
+   `project.yml` (currently `9b1d6e41-5195-4cc5-a0e2-1e00dd2c36e0`); a repository
+   variable named `MS_CLIENT_ID` overrides it.
 5. Under **API permissions**, `User.Read` is there by default; add Microsoft
    Graph → Delegated → **Tasks.Read**. No admin consent is needed for personal
    accounts.
