@@ -246,22 +246,13 @@ enum SharingPresenter {
         top.present(controller, animated: true)
     }
 
-    static func invite(list: TaskList) {
-        let ck = Persistence.shared.ckContainer
-        let title = list.displayName
+    /// Apple's share sheet for an already-created share: Messages sends an
+    /// invitation to the people you pick; Mail and Copy Link work too.
+    static func invite(share: CKShare, title: String) {
         let provider = NSItemProvider()
-        if let share = Persistence.shared.existingShare(for: list) {
-            provider.registerCKShare(share, container: ck, allowedSharingOptions: .standard)
-        } else {
-            let id = list.objectID
-            provider.registerCKShare(container: ck, allowedSharingOptions: .standard) {
-                try await Persistence.shared.makeShare(listID: id)
-            }
-        }
+        provider.registerCKShare(share, container: Persistence.shared.ckContainer, allowedSharingOptions: .standard)
         let config = UIActivityItemsConfiguration(itemProviders: [provider])
-        config.metadataProvider = { key in
-            key == .title ? title : nil
-        }
+        config.metadataProvider = { key in key == .title ? title : nil }
         let controller = UIActivityViewController(activityItemsConfiguration: config)
         guard let top = topViewController() else { return }
         if let pop = controller.popoverPresentationController {

@@ -19,6 +19,7 @@ struct TaskListScreen: View {
     @State private var pendingDelete: TodoTask?
     @State private var sharingError: String?
     @State private var confirmResetSharing = false
+    @State private var preparingShare = false
     @Environment(\.dismiss) private var dismiss
 
     /// For smart lists, `list` is a throwaway placeholder that is never saved.
@@ -119,6 +120,16 @@ struct TaskListScreen: View {
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
             .environment(\.defaultMinListRowHeight, 0)
+        }
+        .overlay {
+            if preparingShare {
+                VStack(spacing: 10) {
+                    ProgressView()
+                    Text("Preparing to share…").font(.subheadline)
+                }
+                .padding(24)
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            }
         }
         .safeAreaInset(edge: .bottom) {
             if smart != .completed {
@@ -403,7 +414,18 @@ struct TaskListScreen: View {
         if Persistence.shared.hasStuckShare(list) {
             confirmResetSharing = true
         } else {
-            SharingPresenter.invite(list: list)
+            guard !preparingShare else { return }
+            preparingShare = true
+            let l = list
+            Task { @MainActor in
+                defer { preparingShare = false }
+                do {
+                    let share = try await Persistence.shared.prepareShare(for: l)
+                    SharingPresenter.invite(share: share, title: l.displayName)
+                } catch {
+                    sharingError = error.localizedDescription
+                }
+            }
         }
     }
 

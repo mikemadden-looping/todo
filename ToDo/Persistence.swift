@@ -148,7 +148,7 @@ final class Persistence {
 
     /// Waits until the list has been uploaded, so sharing doesn't race the first upload.
     @MainActor
-    func waitUntilUploaded(_ list: TaskList, timeout: TimeInterval = 30) async -> Bool {
+    func waitUntilUploaded(_ list: TaskList, timeout: TimeInterval = 60) async -> Bool {
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
             if !list.objectID.isTemporaryID, container.record(for: list.objectID) != nil { return true }
@@ -175,6 +175,19 @@ final class Persistence {
             throw ShareProblem.noLink
         }
         return (share, ck)
+    }
+
+    /// Creates the list's share up front (moving a long list into its shared
+    /// zone can take a while), so the share sheet has nothing left to wait for.
+    @MainActor
+    func prepareShare(for list: TaskList) async throws -> CKShare {
+        do {
+            let (share, _) = try await share(list)
+            return share
+        } catch {
+            SyncMonitor.shared.recordShareError(error)
+            throw error
+        }
     }
 
     /// Creates (or returns) the share for a list; used by the share sheet's
